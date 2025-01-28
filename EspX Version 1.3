@@ -1,0 +1,184 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local espEnabled = true
+
+local function getRole(player)
+    if not player then return "Innocent" end
+
+    if player:FindFirstChild("Backpack") then
+        for _, tool in ipairs(player.Backpack:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == "Gun" then
+                return "Sheriff"
+            elseif tool:IsA("Tool") and tool.Name == "Knife" then
+                return "Murderer"
+            end
+        end
+    end
+
+    if player.Character then
+        for _, tool in ipairs(player.Character:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == "Gun" then
+                return "Sheriff"
+            elseif tool:IsA("Tool") and tool.Name == "Knife" then
+                return "Murderer"
+            end
+        end
+    end
+
+    return "Innocent"
+end
+
+local function getESPColor(role)
+    if role == "Sheriff" then
+        return Color3.fromRGB(0, 0, 255)
+    elseif role == "Murderer" then
+        return Color3.fromRGB(255, 0, 0)
+    else
+        return Color3.fromRGB(255, 255, 255)
+    end
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local function applyESP()
+        if player.Character then
+            local role = getRole(player)
+            local color = getESPColor(role)
+
+            local highlight = player.Character:FindFirstChild("ESP_Highlight")
+            if highlight then
+                highlight.FillColor = color
+                return
+            end
+
+            highlight = Instance.new("Highlight")
+            highlight.Name = "ESP_Highlight"
+            highlight.FillColor = color
+            highlight.FillTransparency = 0.5
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.OutlineTransparency = 0.2
+            highlight.Parent = player.Character
+        end
+    end
+
+    if player.Character then
+        applyESP()
+    end
+
+    player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        applyESP()
+    end)
+end
+
+local function updateESP()
+    while true do
+        if espEnabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local highlight = player.Character:FindFirstChild("ESP_Highlight")
+                    if highlight then
+                        highlight.FillColor = getESPColor(getRole(player))
+                    end
+                end
+            end
+        end
+        task.wait(2)
+    end
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EspX_GUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 100)
+Frame.Position = UDim2.new(0.5, -100, 0.2, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.BackgroundTransparency = 0.1
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Text = "EspX - MM2"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Parent = Frame
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleButton.Position = UDim2.new(0.1, 0, 0.4, 0)
+ToggleButton.Text = "ESP: ON"
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 16
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleButton.Parent = Frame
+
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 10)
+ButtonCorner.Parent = ToggleButton
+
+local function toggleESP()
+    espEnabled = not espEnabled
+    ToggleButton.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if player.Character and player.Character:FindFirstChild("ESP_Highlight") then
+                player.Character.ESP_Highlight.Enabled = espEnabled
+            end
+        end
+    end
+end
+
+ToggleButton.MouseButton1Click:Connect(toggleESP)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    createESP(player)
+end
+
+Players.PlayerAdded:Connect(createESP)
+
+task.spawn(updateESP)
+
+local dragging, dragInput, dragStart, startPos
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
