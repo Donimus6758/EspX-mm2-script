@@ -1,0 +1,200 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TextChatService = game:GetService("TextChatService")
+local LocalPlayer = Players.LocalPlayer
+
+local espEnabled = true
+local chatEnabled = true
+local lastSheriff = nil
+local lastMurderer = nil
+
+local function getRole(player)
+    if not player then return "Innocent" end
+
+    if player:FindFirstChild("Backpack") then
+        for _, tool in ipairs(player.Backpack:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == "Gun" then
+                return "Sheriff"
+            elseif tool:IsA("Tool") and tool.Name == "Knife" then
+                return "Murderer"
+            end
+        end
+    end
+
+    if player.Character then
+        for _, tool in ipairs(player.Character:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == "Gun" then
+                return "Sheriff"
+            elseif tool:IsA("Tool") and tool.Name == "Knife" then
+                return "Murderer"
+            end
+        end
+    end
+
+    return "Innocent"
+end
+
+local function getESPColor(role)
+    if role == "Sheriff" then
+        return Color3.fromRGB(0, 0, 255)
+    elseif role == "Murderer" then
+        return Color3.fromRGB(255, 0, 0)
+    else
+        return Color3.fromRGB(255, 255, 255)
+    end
+end
+
+local function announceRole(role, playerName)
+    if not chatEnabled then return end
+
+    local chatChannel = TextChatService.TextChannels.RBXGeneral
+    if chatChannel then
+        if role == "Sheriff" and lastSheriff ~= playerName then
+            lastSheriff = playerName
+            chatChannel:SendAsync("[ESP-X] Sheriff: " .. playerName)
+        elseif role == "Murderer" and lastMurderer ~= playerName then
+            lastMurderer = playerName
+            chatChannel:SendAsync("[ESP-X] Murderer: " .. playerName)
+        end
+    end
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local function applyESP()
+        if player.Character then
+            local role = getRole(player)
+            local color = getESPColor(role)
+
+            local highlight = player.Character:FindFirstChild("ESP_Highlight")
+            if highlight then
+                highlight.FillColor = color
+                return
+            end
+
+            highlight = Instance.new("Highlight")
+            highlight.Name = "ESP_Highlight"
+            highlight.FillColor = color
+            highlight.FillTransparency = 0.5
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.OutlineTransparency = 0.2
+            highlight.Parent = player.Character
+
+            announceRole(role, player.Name)
+        end
+    end
+
+    if player.Character then
+        applyESP()
+    end
+
+    player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        applyESP()
+    end)
+end
+
+local function updateESP()
+    while true do
+        if espEnabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local highlight = player.Character:FindFirstChild("ESP_Highlight")
+                    if highlight then
+                        local role = getRole(player)
+                        highlight.FillColor = getESPColor(role)
+                        announceRole(role, player.Name)
+                    end
+                end
+            end
+        end
+        task.wait(2)
+    end
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EspX_GUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 170)
+Frame.Position = UDim2.new(0.5, -100, 0.2, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.BackgroundTransparency = 0.1
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Text = "EspX - MM2"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Parent = Frame
+
+local ToggleESPButton = Instance.new("TextButton")
+ToggleESPButton.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleESPButton.Position = UDim2.new(0.1, 0, 0.35, 0)
+ToggleESPButton.Text = "ESP: ON"
+ToggleESPButton.Font = Enum.Font.GothamBold
+ToggleESPButton.TextSize = 16
+ToggleESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleESPButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleESPButton.Parent = Frame
+
+local ButtonCorner1 = Instance.new("UICorner")
+ButtonCorner1.CornerRadius = UDim.new(0, 10)
+ButtonCorner1.Parent = ToggleESPButton
+
+local ToggleChatButton = Instance.new("TextButton")
+ToggleChatButton.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleChatButton.Position = UDim2.new(0.1, 0, 0.7, 0)
+ToggleChatButton.Text = "Chat Announce: ON"
+ToggleChatButton.Font = Enum.Font.GothamBold
+ToggleChatButton.TextSize = 16
+ToggleChatButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleChatButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleChatButton.Parent = Frame
+
+local ButtonCorner2 = Instance.new("UICorner")
+ButtonCorner2.CornerRadius = UDim.new(0, 10)
+ButtonCorner2.Parent = ToggleChatButton
+
+local function toggleESP()
+    espEnabled = not espEnabled
+    ToggleESPButton.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if player.Character and player.Character:FindFirstChild("ESP_Highlight") then
+                player.Character.ESP_Highlight.Enabled = espEnabled
+            end
+        end
+    end
+end
+
+local function toggleChat()
+    chatEnabled = not chatEnabled
+    ToggleChatButton.Text = "Chat Announce: " .. (chatEnabled and "ON" or "OFF")
+end
+
+ToggleESPButton.MouseButton1Click:Connect(toggleESP)
+ToggleChatButton.MouseButton1Click:Connect(toggleChat)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    createESP(player)
+end
+
+Players.PlayerAdded:Connect(createESP)
+
+task.spawn(updateESP)
